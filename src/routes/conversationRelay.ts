@@ -3,6 +3,8 @@ import WebSocket from 'ws';
 import { LLMService } from '../llm';
 import { getLocalTemplateData } from '../lib/utils/llm/getTemplateData';
 import { log } from '../lib/utils/logger';
+import { emitDemo } from '../lib/utils/demoEvents';
+import { analyzeCallerUtterance, addToTranscript } from '../lib/utils/ciAnalyzer';
 
 // Store active conversations
 const activeConversations = new Map<string, {
@@ -145,6 +147,16 @@ export const setupConversationRelayRoute = (app: ExpressWs.Application) => {
           // Start the conversation
           llm.isVoiceCall = true;
           console.log('Starting conversation for ' + phoneNumber);
+
+          // Emit call:start to dashboard
+          emitDemo('call:start', {
+            phoneNumber,
+            callSid,
+            direction,
+            from,
+            to,
+          });
+
           await llm.notifyInitialCallParams();
           await llm.run();
         } else if (data.type === 'message') {
@@ -153,10 +165,11 @@ export const setupConversationRelayRoute = (app: ExpressWs.Application) => {
             console.log('LLM not initialized yet, ignoring message');
             return;
           }
-          llm.addMessage({
-            role: 'user',
-            content: data.content || data.message || ''
-          });
+          const userText = data.content || data.message || '';
+          emitDemo('call:transcript', { speaker: 'claimant', text: userText, phoneNumber });
+          addToTranscript('caller', userText);
+          analyzeCallerUtterance(userText); // fire-and-forget, no await
+          llm.addMessage({ role: 'user', content: userText });
           await llm.run();
         } else if (data.type === 'interrupt') {
           // Handle interruption
@@ -185,11 +198,12 @@ export const setupConversationRelayRoute = (app: ExpressWs.Application) => {
             console.log('LLM not initialized yet, ignoring prompt');
             return;
           }
-          console.log('Received voice prompt:', data.voicePrompt);
-          llm.addMessage({
-            role: 'user',
-            content: data.voicePrompt || ''
-          });
+          const voiceText = data.voicePrompt || '';
+          console.log('Received voice prompt:', voiceText);
+          emitDemo('call:transcript', { speaker: 'claimant', text: voiceText, phoneNumber });
+          addToTranscript('caller', voiceText);
+          analyzeCallerUtterance(voiceText); // fire-and-forget, no await
+          llm.addMessage({ role: 'user', content: voiceText });
           await llm.run();
         } else if (data.type === 'info') {
           // Handle info messages (heartbeat/status updates from Twilio)
@@ -214,6 +228,7 @@ export const setupConversationRelayRoute = (app: ExpressWs.Application) => {
 
     ws.on('close', () => {
       console.log('WebSocket connection closed for ' + phoneNumber);
+      emitDemo('call:ended', { phoneNumber });
       activeConversations.delete(phoneNumber);
       
       const existingActivity = recentActivity.get(phoneNumber);

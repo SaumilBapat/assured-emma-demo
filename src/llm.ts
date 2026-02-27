@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import OpenAI from 'openai';
+import { emitDemo } from './lib/utils/demoEvents';
 
 // Local imports
 import {
@@ -50,6 +51,7 @@ export class LLMService {
     if (this.templateData) {
       this.templateData.toolData = this.templateData.toolData || {};
       this.templateData.toolData.twilioNumber = twilioNumber;
+      this.templateData.toolData.callerPhoneNumber = callerPhoneNumber;
     }
     
     this.addMessage({
@@ -225,6 +227,9 @@ export class LLMService {
               },
             });
 
+            // Emit tool call to dashboard
+            emitDemo('tool:call', { toolName: currentToolName, args, phoneNumber: this.customerNumber });
+
             // Send tool execution to webhook
             await sendToWebhook(
               {
@@ -286,6 +291,20 @@ export class LLMService {
             );
 
             if (result.success) {
+              // Emit tool result to dashboard
+              emitDemo('tool:result', { toolName: currentToolName, success: true, data: result.data, phoneNumber: this.customerNumber });
+
+              // Emit specialized events for key tools
+              if (currentToolName === 'lookupClaimProfile') {
+                emitDemo('claim:loaded', { ...result.data, phoneNumber: this.customerNumber });
+              }
+              if (currentToolName === 'checkTcpaCompliance' && result.data?.optOutDetected) {
+                emitDemo('tcpa:detected', { ...result.data, phoneNumber: this.customerNumber });
+              }
+              if (currentToolName === 'sendRCS' || currentToolName === 'sendText') {
+                emitDemo('message:sent', { toolName: currentToolName, ...result.data, args, phoneNumber: this.customerNumber });
+              }
+
               this.addMessage({
                 role: 'system',
                 content: `Tool call ${currentToolName} succeeded with data: ${JSON.stringify(
@@ -360,6 +379,7 @@ export class LLMService {
 
       // Send final chunk and full text
       if (fullText.length > 1 && this.currentResponseId === responseId) {
+        emitDemo('ai:speaking', { text: fullText, phoneNumber: this.customerNumber });
         this.emit('text', '', true, fullText);
       } else if (this.currentResponseId === responseId) {
         this.run(false); // Continue conversation (not a user prompt)

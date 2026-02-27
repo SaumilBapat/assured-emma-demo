@@ -9,6 +9,8 @@ import { execute as getAirtableDataExecute } from './getAirtableData/executor';
 import { execute as upsertAirtableDataExecute } from './upsertAirtableData/executor';
 import { execute as sendToLiveAgentExecute } from './sendToLiveAgent/executor';
 import { execute as switchLanguageExecute } from './switchLanguage/executor';
+import { execute as lookupClaimProfileExecute } from './lookupClaimProfile/executor';
+import { execute as checkTcpaComplianceExecute } from './checkTcpaCompliance/executor';
 import { ToolExecutorParams, ToolResult } from '../lib/types';
 
 export async function executeTool(params: ToolExecutorParams): Promise<ToolResult> {
@@ -38,6 +40,10 @@ export async function executeTool(params: ToolExecutorParams): Promise<ToolResul
         return await sendToLiveAgentExecute(args, toolData);
       case 'switchLanguage':
         return await switchLanguageExecute(args, toolData);
+      case 'lookupClaimProfile':
+        return await lookupClaimProfileExecute(args, toolData);
+      case 'checkTcpaCompliance':
+        return await checkTcpaComplianceExecute(args, toolData);
       default:
         return {
           success: false,

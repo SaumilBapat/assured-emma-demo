@@ -1,0 +1,1141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Emma · Assured × Twilio Live Demo</title>
+  <script src="/socket.io/socket.io.js"></script>
+  <style>
+    :root {
+      /* Assured brand gradient: blue → purple → pink → orange */
+      --assured-blue: #29B6F6;
+      --assured-purple: #7C3AED;
+      --assured-violet: #9333EA;
+      --assured-pink: #EC4899;
+      --assured-orange: #F97316;
+      --assured-gradient: linear-gradient(135deg, #29B6F6 0%, #7C3AED 45%, #EC4899 80%, #F97316 100%);
+      --twilio-red: #F22F46;
+      --bg: #0D0F1A;
+      --surface: #13162A;
+      --surface2: #1A1E35;
+      --border: rgba(124,58,237,0.15);
+      --border-subtle: rgba(255,255,255,0.06);
+      --text: #E8EBF4;
+      --muted: #6B7280;
+      --green: #22C55E;
+      --amber: #F59E0B;
+      --blue: #29B6F6;
+      --purple: #7C3AED;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ─── HEADER ─── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 24px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0;
+    }
+    .logo-area { display: flex; align-items: center; gap: 16px; }
+    .logo-assured {
+      font-size: 18px;
+      font-weight: 700;
+      color: var(--assured-purple);
+      letter-spacing: -0.5px;
+    }
+    .logo-x { color: var(--muted); font-size: 14px; }
+    .logo-twilio {
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--text);
+    }
+    .header-badge {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; color: var(--muted);
+    }
+    .live-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--muted);
+      transition: background 0.3s;
+    }
+    .live-dot.active { background: var(--green); animation: pulse 1.5s infinite; }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; } 50% { opacity: 0.4; }
+    }
+    .phone-badge {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 4px 12px;
+      font-size: 12px;
+      color: var(--muted);
+    }
+    .phone-badge span { color: var(--text); font-weight: 600; }
+
+    /* ─── LAYOUT ─── */
+    .layout {
+      display: grid;
+      grid-template-columns: 320px 1fr 320px;
+      gap: 1px;
+      flex: 1;
+      overflow: hidden;
+      background: var(--border-subtle);
+    }
+    .panel {
+      background: var(--bg);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      display: flex; align-items: center; gap: 8px;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      flex-shrink: 0;
+    }
+    .panel-header .dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .panel-body { flex: 1; overflow-y: auto; padding: 16px; }
+    .panel-body::-webkit-scrollbar { width: 4px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* ─── CALL STATUS PANEL ─── */
+    .call-status {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .call-status-label {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--muted); margin-bottom: 8px;
+    }
+    .call-state {
+      display: flex; align-items: center; gap: 10px;
+    }
+    .call-icon {
+      width: 40px; height: 40px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      transition: all 0.3s;
+    }
+    .call-icon.active {
+      background: rgba(34,197,94,0.15);
+      border-color: var(--green);
+      animation: ring 0.8s ease-in-out infinite;
+    }
+    @keyframes ring {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+    }
+    .call-info h3 { font-size: 14px; font-weight: 600; }
+    .call-info p { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .call-timer {
+      font-size: 11px; font-weight: 600;
+      color: var(--green); margin-top: 4px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    /* ─── CLAIM CARD ─── */
+    .claim-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 16px;
+      margin-bottom: 12px;
+      transition: border-color 0.4s;
+    }
+    .claim-card.loaded { border-color: rgba(59,130,246,0.4); }
+    .claim-card-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 12px;
+    }
+    .claim-label {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--blue);
+    }
+    .claim-number {
+      font-size: 11px; font-weight: 700;
+      background: rgba(59,130,246,0.15);
+      color: var(--blue);
+      padding: 2px 8px; border-radius: 4px;
+    }
+    .claim-field { margin-bottom: 8px; }
+    .claim-field-label {
+      font-size: 10px; color: var(--muted); margin-bottom: 2px;
+    }
+    .claim-field-value { font-size: 12px; font-weight: 500; }
+    .claim-status-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px;
+      background: rgba(245,158,11,0.15);
+      color: var(--amber);
+    }
+    .claim-placeholder {
+      text-align: center; padding: 24px 0;
+      color: var(--muted); font-size: 12px;
+    }
+    .claim-placeholder .ph-icon { font-size: 28px; margin-bottom: 8px; }
+
+    /* ─── CI INSIGHTS ─── */
+    .ci-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 8px;
+    }
+    .ci-label {
+      font-size: 10px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--purple); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 6px;
+    }
+    .sentiment-bar {
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 8px;
+    }
+    .sentiment-label { font-size: 11px; color: var(--muted); width: 70px; }
+    .sentiment-track {
+      flex: 1; height: 6px; border-radius: 3px;
+      background: var(--surface2); overflow: hidden;
+    }
+    .sentiment-fill {
+      height: 100%; border-radius: 3px;
+      background: linear-gradient(90deg, #EC4899, #7C3AED, #22C55E);
+      transition: width 0.8s ease;
+    }
+    .sentiment-pct {
+      font-size: 11px; font-weight: 600; width: 32px; text-align: right;
+      color: var(--text);
+    }
+    .intent-tag {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 10px; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px;
+      margin: 2px;
+    }
+
+    /* ─── TRANSCRIPT ─── */
+    .transcript-wrap { display: flex; flex-direction: column; gap: 10px; }
+    .msg {
+      display: flex; gap: 10px; align-items: flex-start;
+    }
+    .msg-avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700; flex-shrink: 0;
+    }
+    .msg-avatar.emma { background: var(--assured-purple); color: white; }
+    .msg-avatar.user { background: var(--surface2); border: 1px solid var(--border); color: var(--text); }
+    .msg-content { flex: 1; }
+    .msg-speaker {
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 3px;
+    }
+    .msg-text {
+      font-size: 13px; line-height: 1.5; color: var(--text);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px 8px 8px 2px;
+      padding: 8px 12px;
+    }
+    .msg.user .msg-text {
+      background: rgba(59,130,246,0.08);
+      border-color: rgba(59,130,246,0.2);
+      border-radius: 8px 8px 2px 8px;
+    }
+    .msg-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    /* ─── TOOL EVENTS ─── */
+    .tool-event {
+      display: flex; gap: 10px; align-items: flex-start;
+      padding: 10px 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-size: 12px;
+      animation: slideIn 0.3s ease;
+    }
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .tool-event.claim { border-left: 3px solid var(--blue); }
+    .tool-event.tcpa { border-left: 3px solid var(--assured-purple); }
+    .tool-event.sms { border-left: 3px solid var(--green); }
+    .tool-event.rcs { border-left: 3px solid var(--purple); }
+    .tool-event.escalation { border-left: 3px solid var(--amber); }
+    .tool-icon { font-size: 16px; flex-shrink: 0; }
+    .tool-title { font-weight: 600; margin-bottom: 2px; }
+    .tool-desc { color: var(--muted); font-size: 11px; line-height: 1.4; }
+    .tool-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+    /* ─── RCS INLINE IN TRANSCRIPT ─── */
+    .rcs-inline { display: flex; flex-direction: column; margin: 4px 0; }
+    .rcs-inline.outbound { align-items: flex-end; }
+    .rcs-inline.inbound { align-items: flex-start; }
+    .rcs-inline-label {
+      font-size: 10px; font-weight: 600; color: var(--purple);
+      text-transform: uppercase; letter-spacing: 0.08em;
+      margin-bottom: 4px;
+      display: flex; align-items: center; gap: 4px;
+    }
+    .rcs-inline-label .rcs-badge-small {
+      font-size: 8px; font-weight: 700;
+      background: rgba(139,92,246,0.2); color: var(--purple);
+      padding: 1px 5px; border-radius: 3px;
+    }
+    .rcs-bubble {
+      max-width: 85%;
+      font-size: 12px; line-height: 1.5;
+      padding: 8px 12px;
+      border-radius: 12px;
+    }
+    .rcs-inline.outbound .rcs-bubble {
+      background: var(--assured-purple); color: white;
+      border-radius: 12px 12px 2px 12px;
+    }
+    .rcs-inline.inbound .rcs-bubble {
+      background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); border-radius: 12px 12px 12px 2px;
+    }
+    .rcs-card {
+      background: var(--surface2); border: 1px solid rgba(139,92,246,0.3);
+      border-radius: 14px; overflow: hidden;
+      max-width: 300px; font-size: 12px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    }
+    .rcs-card-img {
+      background: var(--assured-gradient);
+      height: 80px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 32px;
+    }
+    .rcs-card-body { padding: 12px; }
+    .rcs-card-title { font-weight: 700; font-size: 13px; margin-bottom: 6px; color: var(--text); }
+    .rcs-card-desc { color: var(--muted); font-size: 11px; line-height: 1.5; }
+    .rcs-quick-replies { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+    .rcs-qr {
+      background: rgba(124,58,237,0.1); border: 1px solid rgba(124,58,237,0.35);
+      color: var(--assured-purple); font-size: 10px; font-weight: 600;
+      padding: 5px 11px; border-radius: 20px; cursor: pointer; transition: all 0.15s;
+    }
+    .rcs-qr:hover { background: rgba(124,58,237,0.22); }
+    .rcs-qr.tapped { background: var(--assured-purple); color: white; border-color: var(--assured-purple); }
+    .rcs-time { font-size: 10px; color: var(--muted); margin-top: 4px; }
+    .rcs-badge { /* keep for compat */ }
+
+    /* ─── TCPA ALERT ─── */
+    .tcpa-alert {
+      display: none;
+      background: rgba(124,58,237,0.1);
+      border: 1px solid rgba(124,58,237,0.4);
+      border-radius: 10px;
+      padding: 14px;
+      margin-bottom: 12px;
+      animation: slideIn 0.4s ease;
+    }
+    .tcpa-alert.visible { display: block; }
+    .tcpa-alert-header {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 12px; font-weight: 700; color: var(--assured-purple);
+      margin-bottom: 8px;
+    }
+    .tcpa-alert p { font-size: 11px; color: var(--muted); line-height: 1.5; }
+    .tcpa-channels {
+      display: flex; gap: 6px; margin-top: 8px;
+    }
+    .tcpa-channel {
+      font-size: 10px; font-weight: 600;
+      padding: 3px 8px; border-radius: 4px;
+      background: rgba(124,58,237,0.15);
+      color: var(--assured-purple);
+      display: flex; align-items: center; gap: 4px;
+    }
+    .tcpa-channel::before { content: '🚫'; font-size: 9px; }
+
+    /* ─── EMPTY STATES ─── */
+    .empty {
+      text-align: center; padding: 32px 16px;
+      color: var(--muted); font-size: 12px; line-height: 1.6;
+    }
+    .empty-icon { font-size: 32px; margin-bottom: 10px; opacity: 0.5; }
+
+    /* ─── STATUS BAR ─── */
+    footer {
+      display: flex; align-items: center; gap: 20px;
+      padding: 8px 24px;
+      background: var(--surface);
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--muted);
+      flex-shrink: 0;
+    }
+    .status-item { display: flex; align-items: center; gap: 6px; }
+    .status-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+    }
+    .status-dot.green { background: var(--green); }
+    .status-dot.red { background: var(--assured-purple); }
+    .status-dot.blue { background: var(--blue); }
+    .status-dot.grey { background: var(--muted); }
+
+    /* ─── LOADING SHIMMER ─── */
+    .shimmer {
+      background: linear-gradient(90deg, var(--surface) 25%, var(--surface2) 50%, var(--surface) 75%);
+      background-size: 200% 100%;
+      animation: shimmer 1.5s infinite;
+      border-radius: 6px; height: 14px; margin: 4px 0;
+    }
+    @keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+  </style>
+</head>
+<body>
+
+<!-- ─── HEADER ─── -->
+<header>
+  <div class="logo-area">
+    <!-- Assured triangle logo (SVG recreation) -->
+    <svg width="28" height="28" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#29B6F6"/>
+          <stop offset="35%" stop-color="#7C3AED"/>
+          <stop offset="70%" stop-color="#EC4899"/>
+          <stop offset="100%" stop-color="#F97316"/>
+        </linearGradient>
+      </defs>
+      <!-- Stripe 1 (outermost, light blue) -->
+      <polygon points="50,8 88,78 80,78 50,22 20,78 12,78" fill="#29B6F6" opacity="0.9"/>
+      <!-- Stripe 2 -->
+      <polygon points="50,22 80,78 72,78 50,36 28,78 20,78" fill="#5B6FF6" opacity="0.9"/>
+      <!-- Stripe 3 -->
+      <polygon points="50,36 72,78 64,78 50,50 36,78 28,78" fill="#7C3AED" opacity="0.95"/>
+      <!-- Stripe 4 -->
+      <polygon points="50,50 64,78 56,78 50,64 44,78 36,78" fill="#EC4899" opacity="0.95"/>
+      <!-- Stripe 5 (innermost, orange) -->
+      <polygon points="50,64 56,78 44,78" fill="#F97316"/>
+    </svg>
+    <span style="font-size:18px; font-weight:800; color:var(--text); letter-spacing:-0.5px;">Assured</span>
+    <span class="logo-x" style="color:rgba(255,255,255,0.2);">×</span>
+    <span class="logo-twilio" style="font-size:15px; font-weight:600; background:var(--assured-gradient); -webkit-background-clip:text; -webkit-text-fill-color:transparent;">Twilio</span>
+    <span style="margin-left:8px; font-size:11px; color:var(--muted)">Emma AI · Live Claims Demo</span>
+  </div>
+  <div class="header-badge">
+    <span id="live-dot" class="live-dot"></span>
+    <span id="live-label">Waiting for call...</span>
+  </div>
+  <div style="display:flex; gap:10px; align-items:center;">
+    <span class="phone-badge">Emma on <span>+1 (888) 303-5953</span></span>
+    <span id="timer" class="phone-badge" style="display:none; color:var(--green);">⏱ <span id="timer-val">0:00</span></span>
+    <button onclick="resetDemo()" style="background:rgba(255,255,255,0.07); border:1px solid var(--border); color:var(--muted); font-size:11px; padding:4px 12px; border-radius:6px; cursor:pointer; transition:all 0.15s;" onmouseover="this.style.color='var(--text)'" onmouseout="this.style.color='var(--muted)'">↺ Reset</button>
+  </div>
+</header>
+
+<!-- ─── LAYOUT ─── -->
+<div class="layout">
+
+  <!-- LEFT: Call Status + Claim Profile -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot" style="background:var(--green)"></span>
+      Active Call · Claim Profile
+    </div>
+    <div class="panel-body">
+
+      <!-- Call Status -->
+      <div class="call-status">
+        <div class="call-status-label">Call Status</div>
+        <div class="call-state">
+          <div id="call-icon" class="call-icon">📞</div>
+          <div class="call-info">
+            <h3 id="call-state-text">No active call</h3>
+            <p id="call-number">Waiting...</p>
+            <div id="call-timer-row" class="call-timer" style="display:none">● Live</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Claim Profile -->
+      <div id="claim-card" class="claim-card">
+        <div class="claim-card-header">
+          <span class="claim-label">Claim Profile</span>
+          <span id="claim-number-badge" class="claim-number" style="display:none"></span>
+        </div>
+        <div id="claim-content">
+          <div class="claim-placeholder">
+            <div class="ph-icon">🔍</div>
+            <div>Waiting for lookupClaimProfile…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TCPA Alert -->
+      <div id="tcpa-alert" class="tcpa-alert">
+        <div class="tcpa-alert-header">🚨 TCPA Opt-Out Detected</div>
+        <p id="tcpa-desc">Opt-out intent detected. All channels suspended immediately.</p>
+        <div class="tcpa-channels">
+          <span class="tcpa-channel">SMS</span>
+          <span class="tcpa-channel">RCS</span>
+          <span class="tcpa-channel">Voice</span>
+        </div>
+        <p id="tcpa-ticket" style="margin-top:8px; font-size:10px; color:var(--muted)"></p>
+      </div>
+
+      <!-- CI Insights -->
+      <div class="ci-card">
+        <div class="ci-label">
+          🧠 Conversational Intelligence
+          <span style="margin-left:auto; font-size:9px; background:rgba(139,92,246,0.15); color:var(--purple); padding:2px 6px; border-radius:3px; font-weight:700; letter-spacing:0.04em;">REAL-TIME</span>
+        </div>
+
+        <!-- Operator: Detect Sentiment -->
+        <div style="font-size:9px; color:var(--purple); font-weight:600; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Operator · Detect Sentiment</div>
+        <div class="sentiment-bar">
+          <span class="sentiment-label" id="sentiment-label-text">Neutral</span>
+          <div class="sentiment-track">
+            <div id="sentiment-fill" class="sentiment-fill" style="width:60%"></div>
+          </div>
+          <span id="sentiment-pct" class="sentiment-pct">60%</span>
+        </div>
+
+        <!-- Operator: Classify Intent -->
+        <div style="margin-top:10px;">
+          <div style="font-size:9px; color:var(--purple); font-weight:600; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Operator · Classify Intent</div>
+          <div id="intent-tags">
+            <span class="intent-tag" style="background:rgba(59,130,246,0.1);color:var(--blue)">Claim Status Inquiry</span>
+            <span class="intent-tag" style="background:rgba(34,197,94,0.1);color:var(--green)">FNOL Continuation</span>
+          </div>
+        </div>
+
+        <!-- Operator: Extract Named Entities -->
+        <div style="margin-top:10px;">
+          <div style="font-size:9px; color:var(--purple); font-weight:600; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Operator · Extract Named Entities</div>
+          <div id="entities" style="font-size:11px; color:var(--text)">
+            <span style="color:var(--muted)">Listening…</span>
+          </div>
+        </div>
+
+        <!-- Operator: Custom Alerts -->
+        <div id="ci-flags" style="margin-top:10px; display:none;">
+          <div style="font-size:9px; color:var(--purple); font-weight:600; text-transform:uppercase; letter-spacing:0.08em; margin-bottom:4px;">Operator · Custom Detect</div>
+          <div id="ci-flags-list" style="display:flex; flex-wrap:wrap; gap:4px;"></div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- CENTER: Unified Conversation (RCS + Voice) -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot" style="background:var(--blue)"></span>
+      Live Conversation · RCS + ConversationRelay
+    </div>
+    <div class="panel-body" id="transcript-panel">
+      <div class="empty">
+        <div class="empty-icon">🎙</div>
+        <div>Call <strong>+1 (888) 303-5953</strong> to start the demo.<br/>Emma will answer and the conversation will appear here in real-time.</div>
+      </div>
+      <div id="voice-divider" style="display:none;"></div>
+    </div>
+  </div>
+
+  <!-- RIGHT: Tool Events only -->
+  <div class="panel">
+    <div class="panel-header">
+      <span class="dot" style="background:var(--purple)"></span>
+      Twilio Tool Activity
+    </div>
+    <div class="panel-body">
+      <div id="tool-feed">
+        <div class="tool-event claim">
+          <span class="tool-icon">🔍</span>
+          <div>
+            <div class="tool-title">lookupClaimProfile</div>
+            <div class="tool-desc">Pre-loaded — Jordan Kim · CLM-2026-00847 · Progressive</div>
+            <div class="tool-time">Pre-call · Assured CRM</div>
+          </div>
+        </div>
+        <div class="tool-event rcs">
+          <span class="tool-icon">💬</span>
+          <div>
+            <div class="tool-title">sendRCS — Proactive Outreach</div>
+            <div class="tool-desc">Rich card sent via Twilio Messaging · Jordan tapped "Start Claim"</div>
+            <div class="tool-time">9:18 AM · MG910216393b9ab6</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ─── STATUS BAR ─── -->
+<footer>
+  <div class="status-item">
+    <span class="status-dot green"></span>
+    ConversationRelay Active
+  </div>
+  <div class="status-item">
+    <span class="status-dot green"></span>
+    CI Language Operators · Real-Time
+  </div>
+  <div class="status-item">
+    <span class="status-dot blue"></span>
+    ElevenLabs TTS · Deepgram STT
+  </div>
+  <div class="status-item">
+    <span class="status-dot" id="ws-dot" style="background:var(--muted)"></span>
+    <span id="ws-label">Dashboard connecting...</span>
+  </div>
+  <div style="margin-left:auto; color:var(--muted)">
+    Assured × Twilio · Demo 2026 · Account ACcb580c
+  </div>
+</footer>
+
+<script>
+  const socket = io();
+  let callStart = null;
+  let timerInterval = null;
+  let isResetting = false;
+
+  // ─── CONNECTION ───
+  socket.on('connect', () => {
+    document.getElementById('ws-dot').style.background = 'var(--green)';
+    document.getElementById('ws-label').textContent = 'Dashboard connected';
+  });
+  socket.on('disconnect', () => {
+    document.getElementById('ws-dot').style.background = 'var(--assured-purple)';
+    document.getElementById('ws-label').textContent = 'Dashboard disconnected';
+  });
+
+  // ─── CALL START ───
+  socket.on('call:start', (data) => {
+    document.getElementById('live-dot').classList.add('active');
+    document.getElementById('live-label').textContent = `Live call · ${data.phoneNumber}`;
+    document.getElementById('call-icon').classList.add('active');
+    document.getElementById('call-state-text').textContent = 'Active Call';
+    document.getElementById('call-number').textContent = data.phoneNumber;
+    document.getElementById('call-timer-row').style.display = 'block';
+    document.getElementById('timer').style.display = 'inline-flex';
+
+    // Clear empty state, ready for transcript
+    const tp = document.getElementById('transcript-panel');
+    tp.innerHTML = `<div id="voice-divider" style="text-align:center;font-size:10px;color:var(--muted);padding:12px 0 6px;letter-spacing:0.06em;text-transform:uppercase;">📞 Inbound Voice Call — ConversationRelay</div>`;
+    tp.scrollTop = 0;
+
+    // Start timer
+    callStart = Date.now();
+    timerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - callStart) / 1000);
+      const m = Math.floor(elapsed / 60);
+      const s = elapsed % 60;
+      document.getElementById('timer-val').textContent = `${m}:${s.toString().padStart(2,'0')}`;
+    }, 1000);
+
+    addToolEvent('rcs', '📞', 'ConversationRelay — Inbound Call', `From ${data.phoneNumber} · Twilio answered · ConversationRelay WebSocket connected`, data.ts);
+  });
+
+  // ─── CALL ENDED ───
+  socket.on('call:ended', (data) => {
+    document.getElementById('live-dot').classList.remove('active');
+    document.getElementById('live-label').textContent = 'Call ended';
+    document.getElementById('call-icon').classList.remove('active');
+    document.getElementById('call-state-text').textContent = 'Call ended';
+    document.getElementById('call-timer-row').style.display = 'none';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+    addToolEvent('sms', '📵', 'Call Ended', `Conversation closed for ${data.phoneNumber}`, data.ts);
+  });
+
+  // ─── TRANSCRIPT ───
+  socket.on('call:transcript', (data) => {
+    if (isResetting) return;
+    addTranscript(data.speaker === 'claimant' ? 'user' : 'emma', data.text, data.ts);
+  });
+
+  socket.on('ai:speaking', (data) => {
+    if (isResetting) return;
+    addTranscript('emma', data.text, data.ts);
+  });
+
+  // ─── CI REAL-TIME UPDATE ───
+  socket.on('ci:update', (data) => {
+    // Sentiment bar
+    const s = Math.max(0, Math.min(100, data.sentiment ?? 60));
+    sentimentVal = s;
+    document.getElementById('sentiment-fill').style.width = s + '%';
+    document.getElementById('sentiment-pct').textContent = s + '%';
+
+    // Sentiment label + color
+    const labelMap = { positive: 'Positive', neutral: 'Neutral', frustrated: 'Frustrated', angry: 'Angry', anxious: 'Anxious' };
+    const labelEl = document.getElementById('sentiment-label-text');
+    if (labelEl) labelEl.textContent = labelMap[data.sentimentLabel] || 'Neutral';
+
+    const fill = document.getElementById('sentiment-fill');
+    if (s < 30) fill.style.background = 'linear-gradient(90deg, #EC4899, #F97316)';
+    else if (s < 55) fill.style.background = 'linear-gradient(90deg, #F97316, #7C3AED)';
+    else fill.style.background = 'linear-gradient(90deg, #7C3AED, #29B6F6, #22C55E)';
+
+    // Intents
+    const intentColors = {
+      'claim': 'rgba(59,130,246,0.1)', 'status': 'rgba(59,130,246,0.1)',
+      'frustrated': 'rgba(124,58,237,0.1)', 'angry': 'rgba(124,58,237,0.1)',
+      'escalat': 'rgba(245,158,11,0.1)', 'legal': 'rgba(245,158,11,0.1)',
+      'competitor': 'rgba(139,92,246,0.1)', 'geico': 'rgba(139,92,246,0.1)',
+    };
+    const intentTextColors = {
+      'claim': 'var(--blue)', 'status': 'var(--blue)',
+      'frustrated': 'var(--assured-purple)', 'angry': 'var(--assured-purple)',
+      'escalat': 'var(--amber)', 'legal': 'var(--amber)',
+      'competitor': 'var(--purple)', 'geico': 'var(--purple)',
+    };
+    if (data.intents && data.intents.length) {
+      document.getElementById('intent-tags').innerHTML = data.intents.map(intent => {
+        const key = Object.keys(intentColors).find(k => intent.toLowerCase().includes(k)) || '';
+        const bg = intentColors[key] || 'rgba(59,130,246,0.1)';
+        const color = intentTextColors[key] || 'var(--blue)';
+        return `<span class="intent-tag" style="background:${bg};color:${color}">${escapeHtml(intent)}</span>`;
+      }).join('');
+    }
+
+    // Entities
+    if (data.entities && data.entities.length) {
+      document.getElementById('entities').innerHTML = `<div style="display:flex; flex-wrap:wrap; gap:4px;">${
+        data.entities.map(e => `<span class="intent-tag" style="background:rgba(59,130,246,0.08);color:var(--blue)">${escapeHtml(e)}</span>`).join('')
+      }</div>`;
+    }
+
+    // Flags / alerts
+    const flagConfig = {
+      competitor_mention: { label: '⚡ Competitor Mentioned', color: 'var(--purple)', bg: 'rgba(139,92,246,0.15)' },
+      escalation_risk:    { label: '⚠️ Escalation Risk', color: 'var(--amber)', bg: 'rgba(245,158,11,0.15)' },
+      injury_mentioned:   { label: '🚨 Injury Mentioned', color: 'var(--assured-purple)', bg: 'rgba(124,58,237,0.15)' },
+      frustration:        { label: '😤 Frustrated', color: 'var(--assured-purple)', bg: 'rgba(124,58,237,0.1)' },
+      satisfied:          { label: '✅ Satisfied', color: 'var(--green)', bg: 'rgba(34,197,94,0.1)' },
+      urgent:             { label: '🔴 Urgent', color: 'var(--amber)', bg: 'rgba(245,158,11,0.15)' },
+      legal_threat:       { label: '⚖️ Legal Threat', color: 'var(--assured-purple)', bg: 'rgba(124,58,237,0.2)' },
+    };
+    if (data.flags && data.flags.length) {
+      const flagsEl = document.getElementById('ci-flags');
+      flagsEl.style.display = 'block';
+      document.getElementById('ci-flags-list').innerHTML = data.flags.map(f => {
+        const cfg = flagConfig[f] || { label: f, color: 'var(--muted)', bg: 'rgba(255,255,255,0.05)' };
+        return `<span style="font-size:10px;font-weight:600;padding:3px 8px;border-radius:4px;background:${cfg.bg};color:${cfg.color}">${cfg.label}</span>`;
+      }).join('');
+
+      // Show in tool feed for dramatic flags
+      const dramatic = data.flags.filter(f => ['competitor_mention','escalation_risk','injury_mentioned','legal_threat'].includes(f));
+      if (dramatic.length) {
+        const cfg = flagConfig[dramatic[0]];
+        addToolEvent('tcpa', '🚨', `CI Alert: ${cfg.label}`, `Detected in: "${escapeHtml((data.utterance||'').substring(0,80))}"`, data.ts);
+      }
+    } else {
+      document.getElementById('ci-flags-list').innerHTML = '';
+    }
+  });
+
+  // ─── TOOL CALLS ───
+  socket.on('tool:call', (data) => {
+    const icons = {
+      lookupClaimProfile: '🔍',
+      checkTcpaCompliance: '🛡️',
+      sendText: '💬',
+      sendRCS: '📱',
+      sendEmail: '📧',
+      sendToLiveAgent: '👤',
+      switchLanguage: '🌐',
+    };
+    const classes = {
+      lookupClaimProfile: 'claim',
+      checkTcpaCompliance: 'tcpa',
+      sendText: 'sms',
+      sendRCS: 'rcs',
+      sendToLiveAgent: 'escalation',
+    };
+    const icon = icons[data.toolName] || '⚙️';
+    const cls = classes[data.toolName] || '';
+    addToolEvent(cls, icon, `Calling: ${data.toolName}`, JSON.stringify(data.args || {}).substring(0, 120), data.ts);
+  });
+
+  // ─── CLAIM LOADED ───
+  socket.on('claim:loaded', (data) => {
+    const d = data.data || data;
+    const claimant = d.claimant || {};
+    const claim = d.claim || {};
+
+    document.getElementById('claim-card').classList.add('loaded');
+    document.getElementById('claim-number-badge').style.display = 'inline-flex';
+    document.getElementById('claim-number-badge').textContent = claim.claimNumber || 'CLM-2026-00847';
+
+    document.getElementById('claim-content').innerHTML = `
+      <div class="claim-field">
+        <div class="claim-field-label">Claimant</div>
+        <div class="claim-field-value">${claimant.name || 'Jordan Kim'}</div>
+      </div>
+      <div class="claim-field">
+        <div class="claim-field-label">Policy</div>
+        <div class="claim-field-value">${claim.policyNumber || 'PRG-444-7821-KIM'}</div>
+      </div>
+      <div class="claim-field">
+        <div class="claim-field-label">Carrier</div>
+        <div class="claim-field-value">${claim.carrier || 'Progressive Insurance'}</div>
+      </div>
+      <div class="claim-field">
+        <div class="claim-field-label">Vehicle</div>
+        <div class="claim-field-value">${claim.vehicle || '2023 Honda Accord Silver'}</div>
+      </div>
+      <div class="claim-field">
+        <div class="claim-field-label">Incident</div>
+        <div class="claim-field-value">${claim.incidentLocation || 'Market St & Van Ness, SF'}</div>
+      </div>
+      <div class="claim-field">
+        <div class="claim-field-label">Status</div>
+        <div class="claim-field-value">
+          <span class="claim-status-badge">⏳ ${claim.status || 'FNOL Received'}</span>
+        </div>
+      </div>
+      <div class="claim-field">
+        <div class="claim-field-label">Adjuster</div>
+        <div class="claim-field-value">${claim.adjusterName || 'Sarah Chen'}</div>
+      </div>
+    `;
+
+    // Update CI entities
+    document.getElementById('entities').innerHTML = `
+      <div style="display:flex; flex-wrap:wrap; gap:4px;">
+        <span class="intent-tag" style="background:rgba(59,130,246,0.1);color:var(--blue)">Claim #${claim.claimNumber || 'CLM-2026-00847'}</span>
+        <span class="intent-tag" style="background:rgba(139,92,246,0.1);color:var(--purple)">Policy ${claim.policyNumber || 'PRG-444-7821-KIM'}</span>
+        <span class="intent-tag" style="background:rgba(34,197,94,0.1);color:var(--green)">No injuries</span>
+        <span class="intent-tag" style="background:rgba(245,158,11,0.1);color:var(--amber)">Rear-end</span>
+      </div>
+    `;
+
+    addToolEvent('claim', '✅', 'Claim Profile Loaded', `Jordan Kim · ${claim.claimNumber || 'CLM-2026-00847'} · ${claim.carrier || 'Progressive'} · Status: ${claim.status || 'Under Review'}`, data.ts);
+  });
+
+  // ─── TCPA DETECTED ───
+  socket.on('tcpa:detected', (data) => {
+    const d = data.data || data;
+    const alert = document.getElementById('tcpa-alert');
+    alert.classList.add('visible');
+    document.getElementById('tcpa-desc').textContent = `Opt-out intent detected (confidence: ${Math.round((d.intentConfidence || 0.97) * 100)}%). Phrase matched: "${d.matchedPhrase || 'stop bothering'}". All channels suspended.`;
+    document.getElementById('tcpa-ticket').textContent = `Review ticket: ${d.reviewTicket || 'TCPA-2026-XXXXX'} · Human review queued`;
+
+    addToolEvent('tcpa', '🚨', 'TCPA Opt-Out Enforced', `Intent confidence: ${Math.round((d.intentConfidence || 0.97) * 100)}% · SMS + RCS + Voice suspended · Ticket ${d.reviewTicket || 'TCPA-2026-XXXXX'}`, data.ts);
+
+    // Show TCPA exchange inline in transcript
+    const tp = document.getElementById('transcript-panel');
+    const inbound = document.createElement('div');
+    inbound.className = 'rcs-inline inbound';
+    inbound.innerHTML = `<div class="rcs-bubble">stop bothering me im done</div><div class="rcs-time">${formatTime(new Date())} · Read ✓✓</div>`;
+    tp.appendChild(inbound);
+    const outbound = document.createElement('div');
+    outbound.className = 'rcs-inline outbound';
+    outbound.innerHTML = `<div class="rcs-inline-label">Emma (Progressive Claims) <span class="rcs-badge-small">RCS</span></div><div class="rcs-bubble" style="background:var(--surface2);color:var(--muted);">I've noted your request and paused all communication. A team member will follow up if needed.</div><div class="rcs-time">${formatTime(new Date())} · Delivered ✓✓</div>`;
+    tp.appendChild(outbound);
+    const sys = document.createElement('div');
+    sys.style.cssText = 'text-align:center; font-size:10px; color:var(--assured-purple); padding:6px 0; font-weight:600;';
+    sys.textContent = '🚫 All channels suspended — TCPA compliance enforced';
+    tp.appendChild(sys);
+    tp.scrollTop = tp.scrollHeight;
+  });
+
+  // ─── INBOUND SMS ───
+  socket.on('sms:inbound', (data) => {
+    if (isResetting) return;
+    const tp = document.getElementById('transcript-panel');
+    // Add messaging channel divider if this is the first SMS message
+    const existingDividers = tp.querySelectorAll('.channel-divider');
+    const lastDivider = existingDividers[existingDividers.length - 1];
+    if (!lastDivider || lastDivider.textContent.includes('ConversationRelay')) {
+      const divider = document.createElement('div');
+      divider.className = 'channel-divider';
+      divider.innerHTML = '<span>RCS · Bidirectional Messaging</span>';
+      tp.appendChild(divider);
+    }
+    const msg = document.createElement('div');
+    msg.className = 'rcs-inline inbound';
+    msg.innerHTML = `<div class="rcs-bubble">${data.body}</div><div class="rcs-time">${formatTime(new Date())} · Read ✓✓</div>`;
+    tp.appendChild(msg);
+    tp.scrollTop = tp.scrollHeight;
+    addToolEvent('sms', '📨', 'Inbound SMS', `From ${data.from}: "${data.body.substring(0, 60)}${data.body.length > 60 ? '…' : ''}"`, null);
+  });
+
+  // ─── INBOUND MMS IMAGE ───
+  socket.on('sms:image', (data) => {
+    if (isResetting) return;
+    const tp = document.getElementById('transcript-panel');
+    const msg = document.createElement('div');
+    msg.className = 'rcs-inline inbound';
+    msg.innerHTML = `
+      <div class="rcs-bubble" style="padding:6px;">
+        <img src="${data.mediaUrl}" alt="Vehicle damage photo" style="max-width:220px;max-height:180px;border-radius:8px;display:block;" onerror="this.style.display='none'"/>
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">📸 Photo received · Analyzing damage...</div>
+      </div>
+      <div class="rcs-time">${formatTime(new Date())} · Read ✓✓</div>`;
+    tp.appendChild(msg);
+    tp.scrollTop = tp.scrollHeight;
+    addToolEvent('rcs', '📸', 'MMS Photo Received', `Vehicle damage photo from ${data.from} · Running AI damage analysis`, null);
+  });
+
+  // ─── AI DAMAGE ANALYSIS ───
+  socket.on('damage:analysis', (data) => {
+    if (isResetting) return;
+    const tp = document.getElementById('transcript-panel');
+    const severityColor = {
+      minor: '#22c55e',
+      moderate: '#f59e0b',
+      severe: '#ef4444',
+      'total loss': '#7c3aed'
+    }[data.severity?.toLowerCase()] || '#f59e0b';
+
+    const areasHtml = (data.damageAreas || []).map(a => `<span style="background:var(--surface2);border-radius:4px;padding:2px 7px;font-size:10px;margin:2px;display:inline-block;">${a}</span>`).join('');
+
+    const card = document.createElement('div');
+    card.style.cssText = 'margin:8px 12px; border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,0.3);';
+    card.innerHTML = `
+      <div style="background:linear-gradient(135deg,#1e3a5f,#2d1b69);padding:10px 14px;display:flex;align-items:center;gap:8px;">
+        <span style="font-size:18px;">🔍</span>
+        <div>
+          <div style="font-size:11px;font-weight:700;color:#fff;letter-spacing:0.5px;">AI DAMAGE ESTIMATE</div>
+          <div style="font-size:9px;color:rgba(255,255,255,0.6);">GPT-4o Vision · Progressive Insurance</div>
+        </div>
+        <div style="margin-left:auto;background:${severityColor};color:#fff;font-size:9px;font-weight:700;padding:3px 8px;border-radius:20px;text-transform:uppercase;">${data.severity}</div>
+      </div>
+      <div style="background:var(--surface1);padding:12px 14px;">
+        <div style="display:flex;justify-content:space-between;margin-bottom:10px;">
+          <div style="text-align:center;">
+            <div style="font-size:16px;font-weight:700;color:var(--assured-cyan);">${data.estimatedRepairCost}</div>
+            <div style="font-size:9px;color:var(--muted);">Est. Repair Cost</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:16px;font-weight:700;color:var(--assured-purple);">${data.repairTimeEstimate}</div>
+            <div style="font-size:9px;color:var(--muted);">Repair Time</div>
+          </div>
+          <div style="text-align:center;">
+            <div style="font-size:16px;font-weight:700;color:${data.drivable ? '#22c55e' : '#ef4444'};">${data.drivable ? 'Yes' : 'No'}</div>
+            <div style="font-size:9px;color:var(--muted);">Drivable</div>
+          </div>
+        </div>
+        <div style="margin-bottom:8px;"><div style="font-size:9px;color:var(--muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.5px;">Damage Areas</div>${areasHtml}</div>
+        ${data.additionalNotes ? `<div style="font-size:10px;color:var(--muted);font-style:italic;border-top:1px solid var(--border);padding-top:8px;margin-top:4px;">${data.additionalNotes}</div>` : ''}
+        <div style="font-size:9px;color:var(--muted);margin-top:6px;text-align:right;">AI Confidence: ${data.aiConfidence}</div>
+      </div>`;
+    tp.appendChild(card);
+    tp.scrollTop = tp.scrollHeight;
+    addToolEvent('rcs', '🔍', 'AI Damage Analysis Complete', `${data.severity} damage · Est. ${data.estimatedRepairCost} · ${data.repairTimeEstimate} · Drivable: ${data.drivable ? 'Yes' : 'No'}`, null);
+  });
+
+  // ─── MESSAGE SENT ───
+  socket.on('message:sent', (data) => {
+    if (data.toolName === 'sendText') {
+      addToolEvent('sms', '📤', 'SMS Sent', `Follow-up SMS delivered to ${data.phoneNumber}`, data.ts);
+    } else if (data.toolName === 'sendRCS') {
+      // Use dynamic card data from the LLM's tool call
+      const args = data.args || {};
+      const title = data.title || args.title || 'Claim Update';
+      const body = data.body || args.message || '';
+      const emoji = data.cardEmoji || args.cardEmoji || '📋';
+      const replies = data.quickReplies || args.quickReplies || [];
+
+      addToolEvent('rcs', '📱', `RCS Sent · ${title}`, `${body.substring(0, 80)}${body.length > 80 ? '…' : ''} · SMS fallback delivered`, data.ts);
+      addInlineRcsCard({
+        emoji,
+        title,
+        desc: body,
+        replies,
+        time: formatTime(new Date(data.ts || Date.now()))
+      });
+    }
+  });
+
+  // ─── HELPERS ───
+
+  function addTranscript(role, text, ts) {
+    if (!text || text.trim().length < 2) return;
+    const panel = document.getElementById('transcript-panel');
+    const isEmma = role === 'emma';
+    const div = document.createElement('div');
+    div.className = `msg ${isEmma ? '' : 'user'}`;
+    div.innerHTML = `
+      <div class="msg-avatar ${isEmma ? 'emma' : 'user'}">${isEmma ? 'E' : 'J'}</div>
+      <div class="msg-content">
+        <div class="msg-speaker">${isEmma ? 'Emma (AI · Voice)' : 'Jordan Kim'}</div>
+        <div class="msg-text">${escapeHtml(text)}</div>
+        <div class="msg-time">${formatTime(new Date(ts || Date.now()))}</div>
+      </div>
+    `;
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+    if (isEmma) updateCISentiment('calm');
+  }
+
+  function addInlineRcsCard({ emoji, title, desc, replies, time }) {
+    const panel = document.getElementById('transcript-panel');
+    const repliesHtml = (replies || []).map(r => `<span class="rcs-qr" onclick="tapQR(this)">${escapeHtml(r)}</span>`).join('');
+    const div = document.createElement('div');
+    div.className = 'rcs-inline outbound';
+    div.innerHTML = `
+      <div class="rcs-inline-label">Emma (Progressive Claims) <span class="rcs-badge-small">RCS</span></div>
+      <div class="rcs-card">
+        <div class="rcs-card-img">${emoji}</div>
+        <div class="rcs-card-body">
+          <div class="rcs-card-title">${escapeHtml(title)}</div>
+          <div class="rcs-card-desc">${escapeHtml(desc)}</div>
+          <div class="rcs-quick-replies">${repliesHtml}</div>
+        </div>
+      </div>
+      <div class="rcs-time">${time} · Delivered ✓✓</div>
+    `;
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function addInlineMsg(type, text, ts) {
+    const panel = document.getElementById('transcript-panel');
+    const div = document.createElement('div');
+    div.style.cssText = 'text-align:center; font-size:10px; color:var(--muted); padding:6px 0; font-style:italic;';
+    div.textContent = text;
+    panel.appendChild(div);
+    panel.scrollTop = panel.scrollHeight;
+  }
+
+  function addToolEvent(cls, icon, title, desc, ts) {
+    const feed = document.getElementById('tool-feed');
+    const div = document.createElement('div');
+    div.className = `tool-event ${cls}`;
+    div.innerHTML = `
+      <span class="tool-icon">${icon}</span>
+      <div>
+        <div class="tool-title">${escapeHtml(title)}</div>
+        <div class="tool-desc">${escapeHtml(desc)}</div>
+        <div class="tool-time">${formatTime(new Date(ts || Date.now()))}</div>
+      </div>
+    `;
+    feed.appendChild(div);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  let sentimentVal = 60;
+  function updateCISentiment(text) {
+    const negative = ['frustrated', 'angry', 'upset', 'wrong', 'terrible', 'worst', 'ridiculous', 'stop', 'hate', 'done'];
+    const positive = ['thank', 'great', 'perfect', 'appreciate', 'good', 'helpful', 'wonderful'];
+    const lower = (text || '').toLowerCase();
+
+    if (negative.some(w => lower.includes(w))) sentimentVal = Math.max(15, sentimentVal - 15);
+    else if (positive.some(w => lower.includes(w))) sentimentVal = Math.min(95, sentimentVal + 10);
+    else if (lower === 'calm') sentimentVal = Math.min(85, sentimentVal + 3);
+
+    document.getElementById('sentiment-fill').style.width = sentimentVal + '%';
+    document.getElementById('sentiment-pct').textContent = sentimentVal + '%';
+  }
+
+  function resetDemo() {
+    isResetting = true;
+    setTimeout(() => { isResetting = false; }, 2000); // guard for 2s
+
+    // Reset header
+    document.getElementById('live-dot').classList.remove('active');
+    document.getElementById('live-label').textContent = 'Waiting for call...';
+    document.getElementById('timer').style.display = 'none';
+    document.getElementById('timer-val').textContent = '0:00';
+    if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+
+    // Reset call status
+    document.getElementById('call-icon').classList.remove('active');
+    document.getElementById('call-state-text').textContent = 'No active call';
+    document.getElementById('call-number').textContent = 'Waiting...';
+    document.getElementById('call-timer-row').style.display = 'none';
+
+    // Reset claim card
+    document.getElementById('claim-card').classList.remove('loaded');
+    document.getElementById('claim-number-badge').style.display = 'none';
+    document.getElementById('claim-content').innerHTML = `<div class="claim-placeholder"><div class="ph-icon">🔍</div><div>Waiting for lookupClaimProfile…</div></div>`;
+
+    // Reset TCPA
+    document.getElementById('tcpa-alert').classList.remove('visible');
+
+    // Reset CI
+    sentimentVal = 60;
+    document.getElementById('sentiment-fill').style.width = '60%';
+    document.getElementById('sentiment-fill').style.background = 'linear-gradient(90deg, #EC4899, #7C3AED, #22C55E)';
+    document.getElementById('sentiment-pct').textContent = '60%';
+    const lblEl = document.getElementById('sentiment-label-text');
+    if (lblEl) lblEl.textContent = 'Neutral';
+    document.getElementById('intent-tags').innerHTML = `
+      <span class="intent-tag" style="background:rgba(41,182,246,0.1);color:var(--blue)">Claim Status Inquiry</span>
+      <span class="intent-tag" style="background:rgba(34,197,94,0.1);color:var(--green)">FNOL Continuation</span>`;
+    document.getElementById('entities').innerHTML = '<span style="color:var(--muted)">Listening…</span>';
+    const ciFlags = document.getElementById('ci-flags');
+    if (ciFlags) { ciFlags.style.display = 'none'; document.getElementById('ci-flags-list').innerHTML = ''; }
+
+    // Reset transcript — go fully blank
+    const tp = document.getElementById('transcript-panel');
+    tp.style.transition = 'opacity 0.15s';
+    tp.style.opacity = '0';
+    setTimeout(() => {
+      tp.innerHTML = `
+        <div class="empty">
+          <div class="empty-icon">🎙</div>
+          <div>Call <strong>+1 (888) 303-5953</strong> to start the demo.<br/>Emma will answer and the conversation will appear here in real-time.</div>
+        </div>
+        <div id="voice-divider" style="display:none;"></div>
+      `;
+      tp.scrollTop = 0;
+      tp.style.opacity = '1';
+    }, 150);
+
+    // Reset tool feed
+    const tf = document.getElementById('tool-feed');
+    tf.style.transition = 'opacity 0.15s';
+    tf.style.opacity = '0';
+    setTimeout(() => {
+      tf.innerHTML = `<div class="empty" style="padding:24px 8px;"><div class="empty-icon" style="font-size:20px;">⚙️</div><div>Tool events will appear here during the call.</div></div>`;
+      tf.style.opacity = '1';
+    }, 150);
+  }
+
+  function tapQR(el) {
+    const siblings = el.parentElement.querySelectorAll('.rcs-qr');
+    siblings.forEach(s => s.classList.remove('tapped'));
+    el.classList.add('tapped');
+  }
+
+  function formatTime(d) {
+    return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  }
+
+  function escapeHtml(str) {
+    return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+</script>
+</body>
+</html>

@@ -1,13 +1,17 @@
 import 'dotenv/config';
+import http from 'http';
+import path from 'path';
 import express from 'express';
 import ExpressWs from 'express-ws';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
+import { Server as SocketIOServer } from 'socket.io';
 
 // Local imports
 import { log } from './lib/utils/logger';
+import { setDemoIo } from './lib/utils/demoEvents';
 import { setupConversationRelayRoute } from './routes/conversationRelay';
 import callRouter from './routes/call';
 import smsRouter from './routes/sms';
@@ -20,38 +24,37 @@ import liveNumbersRouter from './routes/liveNumbers';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
-const { app } = ExpressWs(express());
+const expressApp = express();
+const server = http.createServer(expressApp);
+const { app } = ExpressWs(expressApp, server);
+
+// Socket.io — real-time dashboard events
+const io = new SocketIOServer(server, {
+  cors: { origin: '*' },
+});
+setDemoIo(io);
+
+io.on('connection', (socket) => {
+  log.info({ label: 'dashboard', message: 'Dashboard client connected', data: socket.id });
+  socket.on('disconnect', () => {
+    log.info({ label: 'dashboard', message: 'Dashboard client disconnected', data: socket.id });
+  });
+});
 
 // Middleware
-app.use(helmet());
+app.use(helmet({ contentSecurityPolicy: false })); // disable CSP so dashboard inline scripts work
 app.use(compression());
 app.use(morgan('combined'));
-
-// Configure CORS based on environment
-if (process.env.NODE_ENV !== 'production') {
-  // In development, allow localhost:3000 to talk to localhost:3001
-  app.use(
-    cors({
-      origin: 'http://localhost:3000',
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-  );
-} else {
-  // In production, allow your frontend domain
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',') || [];
-  app.use(
-    cors({
-      origin: allowedOrigins,
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization'],
-    })
-  );
-}
-
+app.use(cors({ origin: '*' }));
 app.use(express.urlencoded({ extended: true })).use(express.json());
+
+// Serve static dashboard
+app.use(express.static(path.join(__dirname, '..', 'public')));
+
+// Dashboard route
+app.get('/dashboard', (_req, res) => {
+  res.sendFile(path.join(__dirname, '..', 'public', 'dashboard.html'));
+});
 
 // Set up WebSocket route for conversation relay
 setupConversationRelayRoute(app);
@@ -67,13 +70,17 @@ app.use('/', outboundMessageRouter);
 app.use('/', liveNumbersRouter);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   log.info({
     label: 'server',
     message: `Server listening on port ${PORT}`,
+  });
+  log.info({
+    label: 'server',
+    message: `Dashboard: http://localhost:${PORT}/dashboard`,
   });
 });

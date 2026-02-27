@@ -9,6 +9,8 @@ import { getAirtableDataManifest } from './getAirtableData/manifest';
 import { upsertAirtableDataManifest } from './upsertAirtableData/manifest';
 import { sendToLiveAgentManifest } from './sendToLiveAgent/manifest';
 import { switchLanguageManifest } from './switchLanguage/manifest';
+import { lookupClaimProfileManifest } from './lookupClaimProfile/manifest';
+import { checkTcpaComplianceManifest } from './checkTcpaCompliance/manifest';
 import { ToolManifest } from '../lib/types';
 
 export const tools: Record<string, { manifest: ToolManifest }> = {
@@ -44,5 +46,11 @@ export const tools: Record<string, { manifest: ToolManifest }> = {
   },
   switchLanguage: {
     manifest: switchLanguageManifest,
+  },
+  lookupClaimProfile: {
+    manifest: lookupClaimProfileManifest,
+  },
+  checkTcpaCompliance: {
+    manifest: checkTcpaComplianceManifest,
   },
 };
